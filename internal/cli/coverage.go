@@ -49,6 +49,12 @@ func newCoverageCommand(app App, options *globalOptions) *cobra.Command {
 		Use:  "assess",
 		Args: noArgs,
 		RunE: func(command *cobra.Command, _ []string) error {
+			if command.Flags().Changed("data-source") {
+				return exiterrors.WithCode(
+					exiterrors.CodeInvalidArguments,
+					errors.New("coverage assess does not accept --data-source; coverage assessment always uses live query-scoped sources"),
+				)
+			}
 			topic := strings.TrimSpace(topicInput)
 			if topic == "" {
 				return exiterrors.WithCode(exiterrors.CodeInvalidArguments, errors.New("coverage topic is required"))
@@ -103,6 +109,7 @@ func newCoverageCommand(app App, options *globalOptions) *cobra.Command {
 				Questions: make([]coverageQuestionResult, 0, len(trimmed)),
 			}
 			anyIncomplete := 0
+			var persistErr error
 
 			for _, question := range trimmed {
 				items := make([]domain.KnowledgeItem, 0)
@@ -130,8 +137,8 @@ func newCoverageCommand(app App, options *globalOptions) *cobra.Command {
 					result.Outcome = outcomeNoResults
 				default:
 					result.Outcome = outcomeEvidenceFound
-					if err := persistCoverageEvidence(command.Context(), app, searched, market, items); err != nil {
-						return err
+					if err := persistCoverageEvidence(command.Context(), app, searched, market, items); err != nil && persistErr == nil {
+						persistErr = err
 					}
 				}
 				report.Questions = append(report.Questions, result)
@@ -143,6 +150,10 @@ func newCoverageCommand(app App, options *globalOptions) *cobra.Command {
 
 			if err := writeCoverageReport(app, options, report); err != nil {
 				return err
+			}
+
+			if persistErr != nil {
+				return persistErr
 			}
 
 			if anyIncomplete > 0 {

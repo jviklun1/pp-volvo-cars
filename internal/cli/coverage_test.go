@@ -297,3 +297,85 @@ func TestCoverageJSONGolden(t *testing.T) {
 		t.Fatalf("coverage JSON:\n%s\nwant:\n%s", output.String(), want)
 	}
 }
+
+func TestCoverageRejectsExplicitDataSource(t *testing.T) {
+	for _, value := range []string{"local", "live"} {
+		t.Run(value, func(t *testing.T) {
+			var calls []string
+			source := queryAdapter{now: coverageNow, calls: &calls, byQuery: map[string]queryOutcome{
+				"q": {items: []domain.KnowledgeItem{coverageItem("doc-1", "Plug in the cable.")}},
+			}}
+			var output bytes.Buffer
+			root := NewRoot(newCoverageApp(t, &output, source))
+			root.SetArgs([]string{"coverage", "assess", "--topic", "t", "--question", "q",
+				"--market", "gb", "--data-source", value})
+			err := root.ExecuteContext(context.Background())
+			if exiterrors.CodeOf(err) != exiterrors.CodeInvalidArguments ||
+				!strings.Contains(err.Error(), "does not accept --data-source") {
+				t.Fatalf("error = %v, code = %d", err, exiterrors.CodeOf(err))
+			}
+			if len(calls) != 0 {
+				t.Fatalf("no adapter search may run when --data-source is rejected: %#v", calls)
+			}
+		})
+	}
+}
+
+func TestCoverageWritesReportBeforePersistenceError(t *testing.T) {
+	ctx := context.Background()
+	source := queryAdapter{now: coverageNow, byQuery: map[string]queryOutcome{
+		"Why is my car not charging?": {items: []domain.KnowledgeItem{coverageItem("doc-1", "Plug in the cable.")}},
+	}}
+	var output bytes.Buffer
+	app := newCoverageApp(t, &output, source)
+	if err := app.Store.Close(); err != nil {
+		t.Fatalf("close store: %v", err)
+	}
+	root := NewRoot(app)
+	root.SetArgs([]string{"coverage", "assess", "--topic", "Home charging problems",
+		"--question", "Why is my car not charging?", "--market", "gb", "--json"})
+	err := root.ExecuteContext(ctx)
+	if exiterrors.CodeOf(err) != exiterrors.CodeInternal {
+		t.Fatalf("persistence failure should classify as internal (1): code = %d, err = %v", exiterrors.CodeOf(err), err)
+	}
+	var report coverageReport
+	if err := json.Unmarshal(output.Bytes(), &report); err != nil {
+		t.Fatalf("report must be written before the persistence error; invalid JSON: %v\n%s", err, output.String())
+	}
+	if report.Status != statusComplete || len(report.Questions) != 1 || report.Questions[0].Outcome != outcomeEvidenceFound {
+		t.Fatalf("retrieved evidence must be preserved in the report: %#v", report)
+	}
+	if len(report.Questions[0].Results) != 1 {
+		t.Fatalf("evidence results must survive the persistence failure: %#v", report.Questions[0])
+	}
+}
+
+func TestCoveragePersistenceErrorWinsOverSourceError(t *testing.T) {
+	ctx := context.Background()
+	source := queryAdapter{now: coverageNow, byQuery: map[string]queryOutcome{
+		"good": {items: []domain.KnowledgeItem{coverageItem("doc-1", "Plug in the cable.")}},
+		"bad":  {err: errors.New("support document was not found")},
+	}}
+	var output bytes.Buffer
+	app := newCoverageApp(t, &output, source)
+	if err := app.Store.Close(); err != nil {
+		t.Fatalf("close store: %v", err)
+	}
+	root := NewRoot(app)
+	root.SetArgs([]string{"coverage", "assess", "--topic", "t",
+		"--question", "good", "--question", "bad", "--market", "gb", "--json"})
+	err := root.ExecuteContext(ctx)
+	if exiterrors.CodeOf(err) != exiterrors.CodeInternal {
+		t.Fatalf("persistence failure must win over source-error exit 5: code = %d, err = %v", exiterrors.CodeOf(err), err)
+	}
+	var report coverageReport
+	if err := json.Unmarshal(output.Bytes(), &report); err != nil {
+		t.Fatalf("report must still be written: %v\n%s", err, output.String())
+	}
+	if report.Status != statusIncomplete {
+		t.Fatalf("status = %q, want incomplete (source diagnostics retained)", report.Status)
+	}
+	if report.Questions[1].Outcome != outcomeSourceError {
+		t.Fatalf("per-question source diagnostic must remain in the report: %#v", report.Questions[1])
+	}
+}
