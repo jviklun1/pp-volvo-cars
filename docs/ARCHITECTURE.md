@@ -59,5 +59,12 @@ stale; the support API is query-scoped, so auto mode captures the current query 
 `get` rejects live mode because its synthetic item ID exists only after capture. JSON field names
 and process exit codes are stable agent contracts.
 
+`volvo sync --market <market>` also refreshes the local market/model catalog. The support adapter
+returns all entries from `markets { id caption }` plus the selected market's entries from
+`market(id: $market) { carsByDisplayName { displayName modelSlug } }`; the CLI persists those
+normalized values before updating the source snapshot. `volvo markets list` and `volvo models
+list` therefore reflect the last successful sync. Query-scoped auto-search remains lean and does
+not populate the catalog.
+
 The module path is temporarily `example.com/volvo` until the owning internal Git organization is
 selected.

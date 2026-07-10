@@ -23,7 +23,16 @@ mapping fixture; the client has bounded retry, rate-limit, response-size, and ti
 This API is search-first: it does not expose a complete market-wide document enumeration. Its
 cache scope is therefore query-specific. `--data-source auto` searches the live support service,
 persists those normalized results, and then uses local FTS. The `sync` operation verifies market
-availability but must not be interpreted as a full corpus export.
+availability and refreshes the catalog, but must not be interpreted as a full corpus export.
+
+Catalog refresh uses the verified GraphQL fields `markets { id caption }` and
+`market(id: $market) { carsByDisplayName { displayName modelSlug } }`. The latter is the
+model-listing field; `carByModelSlug` remains the separate slug-input lookup used for car-scoped
+search. This contract is grounded in the authoritative
+`volvo-cars-support/references/graphql-schema.md` `Market` table and example query 4. A sync stores
+all returned markets and the selected market's de-duplicated model slugs. `volvo markets list` and
+`volvo models list` expose the last successful sync; query-scoped auto-search does not refresh
+either catalog.
 
 The public API currently exposes the United Kingdom as `uk` (including duplicate market rows).
 The CLI retains canonical `gb` and translates to `uk` only at the upstream boundary. Market and
@@ -45,3 +54,13 @@ retrieval mechanism.
 Stable support/manual content uses a seven-day threshold. Volatile market pages, offers, pricing,
 and campaigns use a 24-hour threshold. Results retain capture time, source identity, market, and
 language so callers can judge evidence freshness.
+
+## Known limitations (v1)
+
+- `internal/adapter/marketpages`, the `market_page`/`offer`/`pricing`/`campaign` source types, and
+  volatile freshness handling are implemented and tested but are not wired into the binary. The
+  composition root currently registers only support GraphQL; a market-page fetch path remains
+  gated on Q3 acquisition approval.
+- Runtime paths currently emit exit codes 0 (success), 1 (internal), 3 (not found), 4 (invalid
+  arguments), and 7 (rate limited), plus 2 if an upstream authentication boundary applies. Code 5
+  remains reserved until insufficient-evidence behavior is a deliberate product decision.
