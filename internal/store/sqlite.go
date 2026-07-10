@@ -7,6 +7,7 @@ import (
 	_ "embed"
 	stderrors "errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jviklun1/pp-volvo-cars/internal/domain"
@@ -46,6 +47,91 @@ func (store *Store) Close() error {
 
 // UpsertItem transactionally replaces an item and its child evidence rows.
 func (store *Store) UpsertItem(ctx context.Context, item domain.KnowledgeItem) error {
+	tx, err := store.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin item upsert: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if err := upsertItemTx(ctx, tx, item); err != nil {
+		return err
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit item upsert: %w", err)
+	}
+	return nil
+}
+
+// ReplaceSourceMarket atomically replaces one complete source-market slice.
+func (store *Store) ReplaceSourceMarket(
+	ctx context.Context,
+	sourceType domain.SourceType,
+	market domain.Market,
+	items []domain.KnowledgeItem,
+) error {
+	if !sourceType.Valid() {
+		return fmt.Errorf("invalid replacement source type %q", sourceType)
+	}
+	if strings.TrimSpace(string(market)) == "" {
+		return fmt.Errorf("replacement market is required")
+	}
+
+	tx, err := store.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin source-market replacement: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	retained := make(map[string]struct{}, len(items))
+	for _, item := range items {
+		if item.SourceType != sourceType || item.Market != market {
+			return fmt.Errorf(
+				"replacement item %q belongs to source %q market %q, want source %q market %q",
+				item.ID, item.SourceType, item.Market, sourceType, market,
+			)
+		}
+		if err := upsertItemTx(ctx, tx, item); err != nil {
+			return err
+		}
+		retained[item.ID] = struct{}{}
+	}
+
+	rows, err := tx.QueryContext(ctx, `
+        SELECT id FROM knowledge_items
+        WHERE source_type = ? AND market = ?`, sourceType, market)
+	if err != nil {
+		return fmt.Errorf("query obsolete source-market items: %w", err)
+	}
+	var obsolete []string
+	for rows.Next() {
+		var itemID string
+		if err := rows.Scan(&itemID); err != nil {
+			_ = rows.Close()
+			return fmt.Errorf("scan obsolete source-market item: %w", err)
+		}
+		if _, ok := retained[itemID]; !ok {
+			obsolete = append(obsolete, itemID)
+		}
+	}
+	if err := rows.Close(); err != nil {
+		return fmt.Errorf("close obsolete source-market items: %w", err)
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate obsolete source-market items: %w", err)
+	}
+	for _, itemID := range obsolete {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM knowledge_items WHERE id = ?`, itemID); err != nil {
+			return fmt.Errorf("delete obsolete source-market item %q: %w", itemID, err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit source-market replacement: %w", err)
+	}
+	return nil
+}
+
+func upsertItemTx(ctx context.Context, tx *sql.Tx, item domain.KnowledgeItem) error {
 	if err := item.Valid(); err != nil {
 		return err
 	}
@@ -56,14 +142,8 @@ func (store *Store) UpsertItem(ctx context.Context, item domain.KnowledgeItem) e
 		return fmt.Errorf("knowledge item content hash does not match its body")
 	}
 
-	tx, err := store.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("begin item upsert: %w", err)
-	}
-	defer func() { _ = tx.Rollback() }()
-
 	var oldHash string
-	err = tx.QueryRowContext(ctx, `SELECT content_hash FROM knowledge_items WHERE id = ?`, item.ID).Scan(&oldHash)
+	err := tx.QueryRowContext(ctx, `SELECT content_hash FROM knowledge_items WHERE id = ?`, item.ID).Scan(&oldHash)
 	if err != nil && !stderrors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf("read existing content hash: %w", err)
 	}
@@ -116,9 +196,6 @@ func (store *Store) UpsertItem(ctx context.Context, item domain.KnowledgeItem) e
 		}
 	}
 
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit item upsert: %w", err)
-	}
 	return nil
 }
 
