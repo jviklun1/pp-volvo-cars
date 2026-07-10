@@ -67,6 +67,10 @@ func coverageItem(sourceID, body string) domain.KnowledgeItem {
 	return item
 }
 
+type failingWriter struct{ err error }
+
+func (w failingWriter) Write([]byte) (int, error) { return 0, w.err }
+
 func newCoverageApp(t *testing.T, output *bytes.Buffer, source adapter.Adapter) App {
 	t.Helper()
 	database, err := store.Open(context.Background(), filepath.Join(t.TempDir(), "cli.sqlite"))
@@ -377,5 +381,31 @@ func TestCoveragePersistenceErrorWinsOverSourceError(t *testing.T) {
 	}
 	if report.Questions[1].Outcome != outcomeSourceError {
 		t.Fatalf("per-question source diagnostic must remain in the report: %#v", report.Questions[1])
+	}
+}
+
+func TestCoverageTextReportWriteFailurePropagates(t *testing.T) {
+	ctx := context.Background()
+	writeErr := errors.New("stdout closed")
+	source := queryAdapter{now: coverageNow, byQuery: map[string]queryOutcome{
+		"good": {items: []domain.KnowledgeItem{coverageItem("doc-1", "Plug in the cable.")}},
+		"bad":  {err: errors.New("support document was not found")},
+	}}
+	app := newCoverageApp(t, &bytes.Buffer{}, source)
+	// Closing the store makes persistence fail and the source-error question makes the aggregate
+	// exit-5 path a candidate; the default text write failure must win over both.
+	if err := app.Store.Close(); err != nil {
+		t.Fatalf("close store: %v", err)
+	}
+	app.Out = failingWriter{err: writeErr}
+	root := NewRoot(app)
+	root.SetArgs([]string{"coverage", "assess", "--topic", "t",
+		"--question", "good", "--question", "bad", "--market", "gb"})
+	err := root.ExecuteContext(ctx)
+	if !errors.Is(err, writeErr) {
+		t.Fatalf("text write failure must be returned, not replaced by exit 5 or a persistence error: %v", err)
+	}
+	if exiterrors.CodeOf(err) == exiterrors.CodeInsufficientEvidence {
+		t.Fatalf("write error must not be replaced by aggregate exit 5: %v", err)
 	}
 }

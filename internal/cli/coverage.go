@@ -209,9 +209,13 @@ func writeCoverageReport(app App, options *globalOptions, report coverageReport)
 	if options.JSON || options.Compact {
 		return writeValue(app, options, report)
 	}
-	fmt.Fprintf(app.Out, "%s\t%s\t%s\n", report.Topic, report.Market, report.Status)
+	if _, err := fmt.Fprintf(app.Out, "%s\t%s\t%s\n", report.Topic, report.Market, report.Status); err != nil {
+		return err
+	}
 	for _, question := range report.Questions {
-		fmt.Fprintf(app.Out, "%s\t%s\t%d\n", question.Question, question.Outcome, len(question.Results))
+		if _, err := fmt.Fprintf(app.Out, "%s\t%s\t%d\n", question.Question, question.Outcome, len(question.Results)); err != nil {
+			return err
+		}
 	}
 	return nil
 }
