@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"example.com/volvo/internal/adapter"
 	"example.com/volvo/internal/domain"
 	exiterrors "example.com/volvo/internal/errors"
 	"example.com/volvo/internal/search"
@@ -98,4 +99,84 @@ func TestGetRejectsLiveDataSource(t *testing.T) {
 	if exiterrors.CodeOf(err) != exiterrors.CodeInvalidArguments || !strings.Contains(err.Error(), "stored IDs") {
 		t.Fatalf("get live error = %v, code = %d", err, exiterrors.CodeOf(err))
 	}
+}
+
+func TestRootUnknownCommandUsesInvalidArguments(t *testing.T) {
+	root := NewRoot(App{Out: &bytes.Buffer{}})
+	root.SetArgs([]string{"frobnicate"})
+	err := root.ExecuteContext(context.Background())
+	if exiterrors.CodeOf(err) != exiterrors.CodeInvalidArguments || !strings.Contains(err.Error(), "unknown command") {
+		t.Fatalf("unknown command error = %v, code = %d", err, exiterrors.CodeOf(err))
+	}
+}
+
+func TestBareRootShowsHelp(t *testing.T) {
+	var output bytes.Buffer
+	root := NewRoot(App{Out: &output})
+	root.SetArgs([]string{})
+	if err := root.ExecuteContext(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(output.String(), "Usage:") {
+		t.Fatalf("bare root output = %q, want help", output.String())
+	}
+}
+
+func TestSyncPersistsCatalog(t *testing.T) {
+	ctx := context.Background()
+	database, err := store.Open(ctx, filepath.Join(t.TempDir(), "cli.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+
+	now := time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC)
+	sourceType := domain.SourceTypeSupportArticle
+	source := catalogAdapter{result: adapter.SyncResult{
+		Markets: []domain.MarketRef{{ID: "se", Caption: "Sweden"}},
+		Models:  []domain.ModelRef{{Market: "se", Slug: "xc60", DisplayName: "XC60"}},
+		Snapshot: domain.SourceSnapshot{
+			SourceType: sourceType, Market: "se", FetchStatus: domain.FetchStatusOK,
+			FreshnessTier: domain.FreshnessTierStable, LastFetchedAt: now,
+		},
+	}}
+	root := NewRoot(App{
+		Store: database, Adapters: map[domain.SourceType]adapter.Adapter{sourceType: source},
+		Out: &bytes.Buffer{}, Now: func() time.Time { return now },
+	})
+	root.SetArgs([]string{"sync", "--market", "se", "--json"})
+	if err := root.ExecuteContext(ctx); err != nil {
+		t.Fatal(err)
+	}
+
+	markets, err := database.ListMarkets(ctx)
+	if err != nil || len(markets) != 1 || markets[0].ID != "se" || markets[0].Caption != "Sweden" || len(markets[0].SourceTypes) != 1 || markets[0].SourceTypes[0] != sourceType {
+		t.Fatalf("markets = %#v, error = %v", markets, err)
+	}
+	models, err := database.ListModels(ctx, "se")
+	if err != nil || len(models) != 1 || models[0] != (store.ModelRecord{MarketID: "se", Slug: "xc60", DisplayName: "XC60"}) {
+		t.Fatalf("models = %#v, error = %v", models, err)
+	}
+}
+
+type catalogAdapter struct {
+	result adapter.SyncResult
+}
+
+func (source catalogAdapter) CacheScope() adapter.CacheScope { return adapter.CacheScopeMarket }
+
+func (source catalogAdapter) Sync(context.Context, domain.Market, adapter.SyncOptions) (adapter.SyncResult, error) {
+	return source.result, nil
+}
+
+func (catalogAdapter) Search(context.Context, string, adapter.SearchOptions) ([]domain.KnowledgeItem, error) {
+	return nil, nil
+}
+
+func (catalogAdapter) Get(context.Context, string) (domain.KnowledgeItem, error) {
+	return domain.KnowledgeItem{}, nil
+}
+
+func (catalogAdapter) Status(context.Context, domain.Market) (domain.SourceSnapshot, error) {
+	return domain.SourceSnapshot{}, nil
 }

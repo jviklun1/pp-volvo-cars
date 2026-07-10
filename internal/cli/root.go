@@ -53,6 +53,18 @@ func NewRoot(app App) *cobra.Command {
 		Short:         "Retrieve market-scoped evidence from official Volvo sources",
 		SilenceErrors: true,
 		SilenceUsage:  true,
+		Args: func(command *cobra.Command, args []string) error {
+			if len(args) > 0 {
+				return exiterrors.WithCode(
+					exiterrors.CodeInvalidArguments,
+					fmt.Errorf("unknown command %q for %q", args[0], command.CommandPath()),
+				)
+			}
+			return nil
+		},
+		RunE: func(command *cobra.Command, _ []string) error {
+			return command.Help()
+		},
 		PersistentPreRunE: func(*cobra.Command, []string) error {
 			switch options.DataSource {
 			case "auto", "local", "live":
@@ -141,12 +153,7 @@ func refresh(ctx context.Context, app App, market domain.Market, force bool) err
 		if err != nil {
 			return err
 		}
-		for _, item := range result.Items {
-			if err := app.Store.UpsertItem(ctx, item); err != nil {
-				return err
-			}
-		}
-		if err := app.Store.SaveSnapshot(ctx, result.Snapshot); err != nil {
+		if err := persistSyncResult(ctx, app.Store, sourceType, result); err != nil {
 			return err
 		}
 	}
@@ -186,14 +193,32 @@ func refreshForSearch(ctx context.Context, app App, query string, options adapte
 		if err != nil {
 			return err
 		}
-		for _, item := range result.Items {
-			if err := app.Store.UpsertItem(ctx, item); err != nil {
-				return err
-			}
-		}
-		if err := app.Store.SaveSnapshot(ctx, result.Snapshot); err != nil {
+		if err := persistSyncResult(ctx, app.Store, sourceType, result); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func persistSyncResult(ctx context.Context, database *store.Store, sourceType domain.SourceType, result adapter.SyncResult) error {
+	for _, item := range result.Items {
+		if err := database.UpsertItem(ctx, item); err != nil {
+			return err
+		}
+	}
+	for _, market := range result.Markets {
+		if err := database.SaveMarket(ctx, store.MarketRecord{
+			ID: market.ID, Caption: market.Caption, SourceTypes: []domain.SourceType{sourceType},
+		}); err != nil {
+			return err
+		}
+	}
+	for _, model := range result.Models {
+		if err := database.SaveModel(ctx, store.ModelRecord{
+			MarketID: model.Market, Slug: model.Slug, DisplayName: model.DisplayName,
+		}); err != nil {
+			return err
+		}
+	}
+	return database.SaveSnapshot(ctx, result.Snapshot)
 }
