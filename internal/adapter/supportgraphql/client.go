@@ -12,6 +12,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	exiterrors "example.com/volvo/internal/errors"
 )
 
 const Endpoint = "https://support-content-service.weu-prod.ecpaz.volvocars.biz/api/graphql"
@@ -88,6 +90,12 @@ func (client *Client) query(ctx context.Context, query string, variables map[str
 			}
 		}
 		if response.StatusCode < 200 || response.StatusCode >= 300 {
+			if response.StatusCode == http.StatusTooManyRequests {
+				return fmt.Errorf("Volvo support rate limited: %w", exiterrors.ErrRateLimited)
+			}
+			if response.StatusCode == http.StatusUnauthorized || response.StatusCode == http.StatusForbidden {
+				return fmt.Errorf("Volvo support authentication failed: %w", exiterrors.ErrAuthentication)
+			}
 			return fmt.Errorf("Volvo support GraphQL returned HTTP %d: %s", response.StatusCode, strings.TrimSpace(string(body)))
 		}
 		var envelope graphqlResponse
@@ -109,7 +117,7 @@ func (client *Client) query(ctx context.Context, query string, variables map[str
 		}
 		return nil
 	}
-	return errors.New("Volvo support GraphQL retry budget exhausted")
+	return fmt.Errorf("Volvo support GraphQL retry budget exhausted: %w", exiterrors.ErrRateLimited)
 }
 
 func (client *Client) wait(ctx context.Context) error {
