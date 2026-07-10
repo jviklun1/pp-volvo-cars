@@ -9,6 +9,15 @@ type marketsData struct {
 	} `json:"markets"`
 }
 
+type modelsData struct {
+	Market *struct {
+		CarsByDisplayName []struct {
+			DisplayName string `json:"displayName"`
+			ModelSlug   string `json:"modelSlug"`
+		} `json:"carsByDisplayName"`
+	} `json:"market"`
+}
+
 type searchData struct {
 	Market *struct {
 		Search         searchResponse `json:"search"`

@@ -71,3 +71,48 @@ func TestSearchQueriesUseFieldSpecificEnumTypes(t *testing.T) {
 		t.Fatalf("car search enum contract drifted: %s", carSearchQuery)
 	}
 }
+
+func TestSyncReturnsMarketAndModelCatalog(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		var payload graphqlRequest
+		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
+			t.Error(err)
+		}
+		writer.Header().Set("Content-Type", "application/json")
+		switch {
+		case strings.Contains(payload.Query, "markets {"):
+			_, _ = writer.Write([]byte(`{"data":{"markets":[{"id":"se","caption":"Sweden"},{"id":"uk","caption":"United Kingdom"}]}}`))
+		case strings.Contains(payload.Query, "carsByDisplayName"):
+			if payload.Variables["market"] != "uk" {
+				t.Errorf("variables = %#v", payload.Variables)
+			}
+			_, _ = writer.Write([]byte(`{"data":{"market":{"carsByDisplayName":[{"displayName":"XC60","modelSlug":"xc60"},{"displayName":"XC60 duplicate","modelSlug":"xc60"},{"displayName":"EX30","modelSlug":"ex30"}]}}}`))
+		default:
+			t.Errorf("unexpected query: %s", payload.Query)
+			writer.WriteHeader(http.StatusBadRequest)
+		}
+	}))
+	defer server.Close()
+
+	now := time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC)
+	adapter := newAdapter(newClient(server.URL, server.Client(), 0, 1), func() time.Time { return now })
+	result, err := adapter.Sync(context.Background(), "gb", baseadapter.SyncOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Markets) != 2 || result.Markets[0] != (domain.MarketRef{ID: "se", Caption: "Sweden"}) || result.Markets[1] != (domain.MarketRef{ID: "gb", Caption: "United Kingdom"}) {
+		t.Fatalf("markets = %#v", result.Markets)
+	}
+	wantModels := []domain.ModelRef{
+		{Market: "gb", Slug: "xc60", DisplayName: "XC60"},
+		{Market: "gb", Slug: "ex30", DisplayName: "EX30"},
+	}
+	if len(result.Models) != len(wantModels) {
+		t.Fatalf("models = %#v", result.Models)
+	}
+	for index := range wantModels {
+		if result.Models[index] != wantModels[index] {
+			t.Fatalf("models[%d] = %#v, want %#v", index, result.Models[index], wantModels[index])
+		}
+	}
+}

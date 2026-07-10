@@ -55,6 +55,13 @@ query SearchCar($market: ID!, $modelSlug: String!, $query: String!, $include: [C
 
 const marketsQuery = `query { markets { id caption } }`
 
+const modelsQuery = `
+query Models($market: ID!) {
+  market(id: $market) {
+    carsByDisplayName { displayName modelSlug }
+  }
+}`
+
 const documentQuery = `
 query Document($market: ID!, $documentID: String!, $languages: [String!]) {
   market(id: $market) {
@@ -105,17 +112,43 @@ func (adapter *Adapter) Sync(ctx context.Context, market domain.Market, _ basead
 	}
 	upstream := upstreamMarket(market)
 	found := false
+	markets := make([]domain.MarketRef, 0, len(data.Markets))
 	for _, value := range data.Markets {
+		markets = append(markets, domain.MarketRef{
+			ID:      canonicalMarket(domain.Market(value.ID)),
+			Caption: value.Caption,
+		})
 		if value.ID == upstream {
 			found = true
-			break
 		}
 	}
 	if !found {
 		return baseadapter.SyncResult{}, fmt.Errorf("Volvo support market %q was not found", upstream)
 	}
+	var modelData modelsData
+	if err := adapter.client.query(ctx, modelsQuery, map[string]any{"market": upstream}, &modelData); err != nil {
+		return baseadapter.SyncResult{}, err
+	}
+	if modelData.Market == nil {
+		return baseadapter.SyncResult{}, fmt.Errorf("Volvo support market %q was not found", upstream)
+	}
+	canonical := canonicalMarket(market)
+	models := make([]domain.ModelRef, 0, len(modelData.Market.CarsByDisplayName))
+	seenSlugs := make(map[domain.ModelSlug]struct{}, len(modelData.Market.CarsByDisplayName))
+	for _, value := range modelData.Market.CarsByDisplayName {
+		slug := domain.ModelSlug(value.ModelSlug)
+		if _, seen := seenSlugs[slug]; seen {
+			continue
+		}
+		seenSlugs[slug] = struct{}{}
+		models = append(models, domain.ModelRef{
+			Market:      canonical,
+			Slug:        slug,
+			DisplayName: value.DisplayName,
+		})
+	}
 	snapshot := adapter.recordSnapshot(canonicalMarket(market), "availability")
-	return baseadapter.SyncResult{Snapshot: snapshot}, nil
+	return baseadapter.SyncResult{Markets: markets, Models: models, Snapshot: snapshot}, nil
 }
 
 func (adapter *Adapter) Search(ctx context.Context, query string, options baseadapter.SearchOptions) ([]domain.KnowledgeItem, error) {
