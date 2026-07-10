@@ -18,6 +18,11 @@ type SyncResult struct {
 	Markets  []domain.MarketRef
 	Models   []domain.ModelRef
 	Snapshot domain.SourceSnapshot
+
+	// ReplacesMarket declares that Items completely enumerates the source-market
+	// slice identified by Snapshot. Persisting the result removes obsolete items
+	// from that exact slice after the supplied items are written.
+	ReplacesMarket bool
 }
 
 // SearchOptions carries the explicit market and optional applicability context.
@@ -44,4 +49,10 @@ type Adapter interface {
 	Search(ctx context.Context, query string, options SearchOptions) ([]domain.KnowledgeItem, error)
 	Get(ctx context.Context, itemID string) (domain.KnowledgeItem, error)
 	Status(ctx context.Context, market domain.Market) (domain.SourceSnapshot, error)
+}
+
+// MarketSupporter is an optional adapter capability for sources that only
+// support a subset of otherwise valid Volvo markets.
+type MarketSupporter interface {
+	SupportsMarket(market domain.Market) bool
 }
