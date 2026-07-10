@@ -1,0 +1,36 @@
+package domain
+
+import "time"
+
+// FreshnessTier controls the maximum age allowed before auto-refresh.
+type FreshnessTier string
+
+const (
+	FreshnessTierStable   FreshnessTier = "stable"
+	FreshnessTierVolatile FreshnessTier = "volatile"
+)
+
+// Valid reports whether the freshness tier is part of the v1 contract.
+func (t FreshnessTier) Valid() bool {
+	return t == FreshnessTierStable || t == FreshnessTierVolatile
+}
+
+// FetchStatus describes the last adapter fetch for a source slice.
+type FetchStatus string
+
+const (
+	FetchStatusOK      FetchStatus = "ok"
+	FetchStatusPartial FetchStatus = "partial"
+	FetchStatusFailed  FetchStatus = "failed"
+	FetchStatusStale   FetchStatus = "stale"
+)
+
+// SourceSnapshot records freshness and fetch state for one source and market.
+type SourceSnapshot struct {
+	SourceType    SourceType
+	Market        Market
+	VersionOrHash string
+	FetchStatus   FetchStatus
+	FreshnessTier FreshnessTier
+	LastFetchedAt time.Time
+}
