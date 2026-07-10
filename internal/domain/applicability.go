@@ -19,9 +19,9 @@ type Language string
 // A nil field is a wildcard. An item can carry zero or many applicability rows;
 // zero rows means that it applies to every vehicle in its market.
 type Applicability struct {
-	ModelSlug  *ModelSlug
-	ModelYear  *ModelYear
-	Powertrain *Powertrain
+	ModelSlug  *ModelSlug  `json:"model_slug,omitempty"`
+	ModelYear  *ModelYear  `json:"model_year,omitempty"`
+	Powertrain *Powertrain `json:"powertrain,omitempty"`
 }
 
 // ApplicabilityFilter is the optional vehicle context supplied by a caller.

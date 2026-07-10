@@ -1,0 +1,11 @@
+{
+  "markets": [
+    {
+      "id": "se",
+      "caption": "Sweden",
+      "source_types": [
+        "support_article"
+      ]
+    }
+  ]
+}

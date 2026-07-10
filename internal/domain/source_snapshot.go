@@ -27,10 +27,10 @@ const (
 
 // SourceSnapshot records freshness and fetch state for one source and market.
 type SourceSnapshot struct {
-	SourceType    SourceType
-	Market        Market
-	VersionOrHash string
-	FetchStatus   FetchStatus
-	FreshnessTier FreshnessTier
-	LastFetchedAt time.Time
+	SourceType    SourceType    `json:"source_type"`
+	Market        Market        `json:"market"`
+	VersionOrHash string        `json:"version_or_hash"`
+	FetchStatus   FetchStatus   `json:"fetch_status"`
+	FreshnessTier FreshnessTier `json:"freshness_tier"`
+	LastFetchedAt time.Time     `json:"last_fetched_at"`
 }

@@ -43,18 +43,18 @@ func (s SourceType) Valid() bool {
 
 // KnowledgeItem is the source-independent unit stored and returned by the CLI.
 type KnowledgeItem struct {
-	ID            string
-	SourceType    SourceType
-	SourceID      string
-	Market        Market
-	Language      Language
-	Title         string
-	Body          string
-	RawJSON       []byte
-	Applicability []Applicability
-	CapturedAt    time.Time
-	ContentHash   string
-	Citations     []Citation
+	ID            string          `json:"id"`
+	SourceType    SourceType      `json:"source_type"`
+	SourceID      string          `json:"source_id"`
+	Market        Market          `json:"market"`
+	Language      Language        `json:"language"`
+	Title         string          `json:"title"`
+	Body          string          `json:"body"`
+	RawJSON       []byte          `json:"raw_json,omitempty"`
+	Applicability []Applicability `json:"applicability,omitempty"`
+	CapturedAt    time.Time       `json:"captured_at"`
+	ContentHash   string          `json:"content_hash"`
+	Citations     []Citation      `json:"citations,omitempty"`
 }
 
 // Valid checks the minimum invariants required before an item can be stored.
