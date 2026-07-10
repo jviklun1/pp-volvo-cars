@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"example.com/volvo/internal/domain"
-	"example.com/volvo/internal/search"
-	"example.com/volvo/internal/store"
+	"github.com/jviklun1/pp-volvo-cars/internal/domain"
+	"github.com/jviklun1/pp-volvo-cars/internal/search"
+	"github.com/jviklun1/pp-volvo-cars/internal/store"
 )
 
 func TestLexicalSearchAndPassthroughMatcher(t *testing.T) {

@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	exiterrors "example.com/volvo/internal/errors"
+	exiterrors "github.com/jviklun1/pp-volvo-cars/internal/errors"
 )
 
 func TestClientRetriesRateLimit(t *testing.T) {

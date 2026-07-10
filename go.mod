@@ -1,4 +1,4 @@
-module example.com/volvo
+module github.com/jviklun1/pp-volvo-cars
 
 go 1.26.5
 

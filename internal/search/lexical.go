@@ -5,7 +5,7 @@ import (
 	"errors"
 	"strings"
 
-	"example.com/volvo/internal/domain"
+	"github.com/jviklun1/pp-volvo-cars/internal/domain"
 )
 
 // LexicalStore is the minimal FTS capability required by lexical search.

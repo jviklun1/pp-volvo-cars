@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	exiterrors "example.com/volvo/internal/errors"
+	exiterrors "github.com/jviklun1/pp-volvo-cars/internal/errors"
 )
 
 const Endpoint = "https://support-content-service.weu-prod.ecpaz.volvocars.biz/api/graphql"

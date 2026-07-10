@@ -4,7 +4,7 @@ import (
 	"context"
 	"sort"
 
-	"example.com/volvo/internal/domain"
+	"github.com/jviklun1/pp-volvo-cars/internal/domain"
 )
 
 // Engine composes lexical retrieval with an optional multilingual matcher.

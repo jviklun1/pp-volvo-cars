@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"example.com/volvo/internal/domain"
+	"github.com/jviklun1/pp-volvo-cars/internal/domain"
 )
 
 // SearchFTS searches one explicit market and optional language.

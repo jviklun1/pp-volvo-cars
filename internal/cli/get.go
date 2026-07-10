@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	exiterrors "example.com/volvo/internal/errors"
+	exiterrors "github.com/jviklun1/pp-volvo-cars/internal/errors"
 	"github.com/spf13/cobra"
 )
 

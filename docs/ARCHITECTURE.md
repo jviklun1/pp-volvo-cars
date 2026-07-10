@@ -66,5 +66,5 @@ normalized values before updating the source snapshot. `volvo markets list` and 
 list` therefore reflect the last successful sync. Query-scoped auto-search remains lean and does
 not populate the catalog.
 
-The module path is temporarily `example.com/volvo` until the owning internal Git organization is
+The module path is temporarily `github.com/jviklun1/pp-volvo-cars` until the owning internal Git organization is
 selected.

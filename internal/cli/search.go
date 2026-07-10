@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"example.com/volvo/internal/adapter"
-	"example.com/volvo/internal/domain"
-	exiterrors "example.com/volvo/internal/errors"
+	"github.com/jviklun1/pp-volvo-cars/internal/adapter"
+	"github.com/jviklun1/pp-volvo-cars/internal/domain"
+	exiterrors "github.com/jviklun1/pp-volvo-cars/internal/errors"
 	"github.com/spf13/cobra"
 )
 

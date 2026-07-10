@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"example.com/volvo/internal/domain"
+	"github.com/jviklun1/pp-volvo-cars/internal/domain"
 )
 
 func TestStoreBootstrapFTSAndIdempotency(t *testing.T) {

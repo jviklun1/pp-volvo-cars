@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"example.com/volvo/internal/domain"
+	"github.com/jviklun1/pp-volvo-cars/internal/domain"
 )
 
 var yearPattern = regexp.MustCompile(`\b(?:19|20)\d{2}\b`)

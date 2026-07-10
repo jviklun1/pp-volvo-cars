@@ -3,7 +3,7 @@ package cli
 import (
 	"fmt"
 
-	"example.com/volvo/internal/store"
+	"github.com/jviklun1/pp-volvo-cars/internal/store"
 	"github.com/spf13/cobra"
 )
 

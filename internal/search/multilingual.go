@@ -4,7 +4,7 @@ package search
 import (
 	"context"
 
-	"example.com/volvo/internal/domain"
+	"github.com/jviklun1/pp-volvo-cars/internal/domain"
 )
 
 // Matcher optionally returns cross-language candidates for a query.

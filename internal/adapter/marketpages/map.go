@@ -5,7 +5,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"example.com/volvo/internal/domain"
+	"github.com/jviklun1/pp-volvo-cars/internal/domain"
 )
 
 func mapPage(reader io.Reader, rawURL string, market domain.Market, language domain.Language, capturedAt time.Time) (domain.KnowledgeItem, error) {

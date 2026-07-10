@@ -10,11 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"example.com/volvo/internal/adapter"
-	"example.com/volvo/internal/domain"
-	exiterrors "example.com/volvo/internal/errors"
-	"example.com/volvo/internal/search"
-	"example.com/volvo/internal/store"
+	"github.com/jviklun1/pp-volvo-cars/internal/adapter"
+	"github.com/jviklun1/pp-volvo-cars/internal/domain"
+	exiterrors "github.com/jviklun1/pp-volvo-cars/internal/errors"
+	"github.com/jviklun1/pp-volvo-cars/internal/search"
+	"github.com/jviklun1/pp-volvo-cars/internal/store"
 )
 
 func TestMarketsJSONGoldenAndSearchShape(t *testing.T) {

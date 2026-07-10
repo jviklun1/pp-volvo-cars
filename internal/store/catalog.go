@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"example.com/volvo/internal/domain"
+	"github.com/jviklun1/pp-volvo-cars/internal/domain"
 )
 
 type MarketRecord struct {

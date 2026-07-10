@@ -4,7 +4,7 @@ package adapter
 import (
 	"context"
 
-	"example.com/volvo/internal/domain"
+	"github.com/jviklun1/pp-volvo-cars/internal/domain"
 )
 
 // SyncOptions controls an adapter refresh without leaking source-specific flags.

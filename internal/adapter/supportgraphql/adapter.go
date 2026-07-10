@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	baseadapter "example.com/volvo/internal/adapter"
-	"example.com/volvo/internal/domain"
+	baseadapter "github.com/jviklun1/pp-volvo-cars/internal/adapter"
+	"github.com/jviklun1/pp-volvo-cars/internal/domain"
 )
 
 const marketSearchQuery = `

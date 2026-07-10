@@ -4,7 +4,7 @@ import (
 	"io"
 	"time"
 
-	"example.com/volvo/internal/domain"
+	"github.com/jviklun1/pp-volvo-cars/internal/domain"
 )
 
 func ParseSE(reader io.Reader, pageURL string, capturedAt time.Time) (domain.KnowledgeItem, error) {
