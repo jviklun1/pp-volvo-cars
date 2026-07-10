@@ -2,6 +2,8 @@ package store
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"path/filepath"
 	"testing"
 	"time"
@@ -86,6 +88,156 @@ func TestStoreBootstrapFTSAndIdempotency(t *testing.T) {
 	}
 }
 
+func TestReplaceSourceMarketPrunesOnlyTheCompletedSlice(t *testing.T) {
+	ctx := context.Background()
+	database, err := Open(ctx, filepath.Join(t.TempDir(), "knowledge.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+
+	keep := replacementTestItem(domain.SourceTypeMarketPage, "keep", "se", "sv", "keep original")
+	removed := replacementTestItem(domain.SourceTypeMarketPage, "removed", "se", "sv", "obsolete page text")
+	otherMarket := replacementTestItem(domain.SourceTypeMarketPage, "other-market", "gb", "en", "other market")
+	otherSource := replacementTestItem(domain.SourceTypeSupportArticle, "other-source", "se", "sv", "other source")
+	for _, item := range []domain.KnowledgeItem{keep, removed, otherMarket, otherSource} {
+		if err := database.UpsertItem(ctx, item); err != nil {
+			t.Fatalf("UpsertItem(%q) error = %v", item.SourceID, err)
+		}
+	}
+
+	changed := keep
+	changed.Body = "keep changed"
+	changed.ContentHash = domain.DeriveContentHash(changed.Body)
+	added := replacementTestItem(domain.SourceTypeMarketPage, "added", "se", "sv", "new page")
+	if err := database.ReplaceSourceMarket(
+		ctx,
+		domain.SourceTypeMarketPage,
+		"se",
+		[]domain.KnowledgeItem{changed, added},
+	); err != nil {
+		t.Fatalf("ReplaceSourceMarket() error = %v", err)
+	}
+
+	for _, want := range []domain.KnowledgeItem{changed, added, otherMarket, otherSource} {
+		got, err := database.GetItem(ctx, want.ID)
+		if err != nil {
+			t.Fatalf("GetItem(%q) error = %v", want.SourceID, err)
+		}
+		if got.Body != want.Body {
+			t.Errorf("GetItem(%q).Body = %q, want %q", want.SourceID, got.Body, want.Body)
+		}
+	}
+	if _, err := database.GetItem(ctx, removed.ID); !errors.Is(err, sql.ErrNoRows) {
+		t.Fatalf("GetItem(removed) error = %v, want sql.ErrNoRows", err)
+	}
+
+	results, err := database.SearchFTS(ctx, "obsolete", "se", nil, domain.ApplicabilityFilter{}, 10)
+	if err != nil {
+		t.Fatalf("SearchFTS() error = %v", err)
+	}
+	if len(results) != 0 {
+		t.Fatalf("SearchFTS() returned pruned item: %#v", results)
+	}
+
+	for _, table := range []string{"citations", "applicability"} {
+		var count int
+		if err := database.db.QueryRowContext(
+			ctx,
+			`SELECT count(*) FROM `+table+` WHERE knowledge_item_id = ?`,
+			removed.ID,
+		).Scan(&count); err != nil {
+			t.Fatalf("count pruned %s: %v", table, err)
+		}
+		if count != 0 {
+			t.Errorf("pruned %s count = %d, want 0", table, count)
+		}
+	}
+
+	var diffCount int
+	if err := database.db.QueryRowContext(ctx, `SELECT count(*) FROM content_diffs`).Scan(&diffCount); err != nil {
+		t.Fatal(err)
+	}
+	if diffCount != 1 {
+		t.Fatalf("content diff count = %d, want one changed survivor and no deletion diff", diffCount)
+	}
+	var diffItemID string
+	if err := database.db.QueryRowContext(ctx, `SELECT knowledge_item_id FROM content_diffs`).Scan(&diffItemID); err != nil {
+		t.Fatal(err)
+	}
+	if diffItemID != keep.ID {
+		t.Errorf("content diff item = %q, want changed survivor %q", diffItemID, keep.ID)
+	}
+}
+
+func TestReplaceSourceMarketRollsBackOnMidTransactionFailure(t *testing.T) {
+	ctx := context.Background()
+	database, err := Open(ctx, filepath.Join(t.TempDir(), "knowledge.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+
+	original := replacementTestItem(domain.SourceTypeMarketPage, "original", "se", "sv", "original body")
+	if err := database.UpsertItem(ctx, original); err != nil {
+		t.Fatal(err)
+	}
+
+	changed := original
+	changed.Body = "changed body"
+	changed.ContentHash = domain.DeriveContentHash(changed.Body)
+	invalid := replacementTestItem(domain.SourceTypeMarketPage, "invalid", "se", "sv", "invalid body")
+	invalid.ContentHash = "not-the-derived-hash"
+	if err := database.ReplaceSourceMarket(
+		ctx,
+		domain.SourceTypeMarketPage,
+		"se",
+		[]domain.KnowledgeItem{changed, invalid},
+	); err == nil {
+		t.Fatal("ReplaceSourceMarket() error = nil, want invalid content hash")
+	}
+
+	got, err := database.GetItem(ctx, original.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Body != original.Body || got.ContentHash != original.ContentHash {
+		t.Fatalf("rolled-back item = (%q, %q), want (%q, %q)", got.Body, got.ContentHash, original.Body, original.ContentHash)
+	}
+	if _, err := database.GetItem(ctx, invalid.ID); !errors.Is(err, sql.ErrNoRows) {
+		t.Fatalf("GetItem(invalid) error = %v, want sql.ErrNoRows", err)
+	}
+	var diffCount int
+	if err := database.db.QueryRowContext(ctx, `SELECT count(*) FROM content_diffs`).Scan(&diffCount); err != nil {
+		t.Fatal(err)
+	}
+	if diffCount != 0 {
+		t.Fatalf("content diff count after rollback = %d, want 0", diffCount)
+	}
+}
+
+func TestReplaceSourceMarketRejectsMismatchedItemScope(t *testing.T) {
+	ctx := context.Background()
+	database, err := Open(ctx, filepath.Join(t.TempDir(), "knowledge.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+
+	item := replacementTestItem(domain.SourceTypeMarketPage, "gb-page", "gb", "en", "wrong market")
+	if err := database.ReplaceSourceMarket(
+		ctx,
+		domain.SourceTypeMarketPage,
+		"se",
+		[]domain.KnowledgeItem{item},
+	); err == nil {
+		t.Fatal("ReplaceSourceMarket() error = nil, want market mismatch")
+	}
+	if _, err := database.GetItem(ctx, item.ID); !errors.Is(err, sql.ErrNoRows) {
+		t.Fatalf("GetItem(mismatched) error = %v, want sql.ErrNoRows", err)
+	}
+}
+
 func TestIsStale(t *testing.T) {
 	ctx := context.Background()
 	store, err := Open(ctx, filepath.Join(t.TempDir(), "knowledge.sqlite"))
@@ -136,4 +288,38 @@ func TestEmptyCollectionsAreNonNil(t *testing.T) {
 	if err != nil || diffs == nil || len(diffs) != 0 {
 		t.Fatalf("ListContentDiffs() = %#v, %v; want non-nil empty slice", diffs, err)
 	}
+}
+
+func replacementTestItem(
+	sourceType domain.SourceType,
+	sourceID string,
+	market domain.Market,
+	language domain.Language,
+	body string,
+) domain.KnowledgeItem {
+	capturedAt := time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC)
+	model := domain.ModelSlug("ex30")
+	item := domain.KnowledgeItem{
+		SourceType: sourceType,
+		SourceID:   sourceID,
+		Market:     market,
+		Language:   language,
+		Title:      sourceID,
+		Body:       body,
+		CapturedAt: capturedAt,
+		Applicability: []domain.Applicability{
+			{ModelSlug: &model},
+		},
+		Citations: []domain.Citation{
+			{
+				SourceURL:  "https://www.volvocars.com/" + string(market) + "/" + sourceID,
+				Excerpt:    body,
+				Language:   language,
+				CapturedAt: capturedAt,
+			},
+		},
+	}
+	item.ID = domain.DeriveID(item.SourceType, item.SourceID, item.Market, item.Language)
+	item.ContentHash = domain.DeriveContentHash(item.Body)
+	return item
 }
