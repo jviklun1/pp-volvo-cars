@@ -111,3 +111,29 @@ func TestIsStale(t *testing.T) {
 		t.Fatalf("fresh snapshot = (%v, %q, %v)", stale, tier, err)
 	}
 }
+
+func TestEmptyCollectionsAreNonNil(t *testing.T) {
+	ctx := context.Background()
+	store, err := Open(ctx, filepath.Join(t.TempDir(), "knowledge.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	markets, err := store.ListMarkets(ctx)
+	if err != nil || markets == nil || len(markets) != 0 {
+		t.Fatalf("ListMarkets() = %#v, %v; want non-nil empty slice", markets, err)
+	}
+	models, err := store.ListModels(ctx, "se")
+	if err != nil || models == nil || len(models) != 0 {
+		t.Fatalf("ListModels() = %#v, %v; want non-nil empty slice", models, err)
+	}
+	snapshots, err := store.ListSnapshots(ctx, "se")
+	if err != nil || snapshots == nil || len(snapshots) != 0 {
+		t.Fatalf("ListSnapshots() = %#v, %v; want non-nil empty slice", snapshots, err)
+	}
+	diffs, err := store.ListContentDiffs(ctx, "se", nil, time.Time{})
+	if err != nil || diffs == nil || len(diffs) != 0 {
+		t.Fatalf("ListContentDiffs() = %#v, %v; want non-nil empty slice", diffs, err)
+	}
+}

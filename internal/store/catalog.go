@@ -39,7 +39,7 @@ func (store *Store) ListMarkets(ctx context.Context) ([]MarketRecord, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	var markets []MarketRecord
+	markets := make([]MarketRecord, 0)
 	for rows.Next() {
 		var market MarketRecord
 		var sources string
@@ -69,7 +69,7 @@ func (store *Store) ListModels(ctx context.Context, market domain.Market) ([]Mod
 		return nil, err
 	}
 	defer rows.Close()
-	var models []ModelRecord
+	models := make([]ModelRecord, 0)
 	for rows.Next() {
 		var model ModelRecord
 		if err := rows.Scan(&model.MarketID, &model.Slug, &model.DisplayName); err != nil {
@@ -88,7 +88,7 @@ func (store *Store) ListSnapshots(ctx context.Context, market domain.Market) ([]
 		return nil, err
 	}
 	defer rows.Close()
-	var snapshots []domain.SourceSnapshot
+	snapshots := make([]domain.SourceSnapshot, 0)
 	for rows.Next() {
 		var snapshot domain.SourceSnapshot
 		var fetchedAt string

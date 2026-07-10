@@ -34,7 +34,7 @@ func (store *Store) ListContentDiffs(
 		return nil, err
 	}
 	defer rows.Close()
-	var diffs []ContentDiff
+	diffs := make([]ContentDiff, 0)
 	for rows.Next() {
 		var diff ContentDiff
 		var detectedAt string
