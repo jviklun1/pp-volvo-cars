@@ -90,6 +90,7 @@ func NewRoot(app App) *cobra.Command {
 	root.AddCommand(newSearchCommand(app, options))
 	root.AddCommand(newDiffCommand(app, options))
 	root.AddCommand(newSyncCommand(app, options))
+	root.AddCommand(newCoverageCommand(app, options))
 	return root
 }
 

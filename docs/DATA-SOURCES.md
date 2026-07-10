@@ -62,5 +62,6 @@ language so callers can judge evidence freshness.
   composition root currently registers only support GraphQL; a market-page fetch path remains
   gated on Q3 acquisition approval.
 - Runtime paths currently emit exit codes 0 (success), 1 (internal), 3 (not found), 4 (invalid
-  arguments), and 7 (rate limited), plus 2 if an upstream authentication boundary applies. Code 5
-  remains reserved until insufficient-evidence behavior is a deliberate product decision.
+  arguments), 5 (insufficient evidence), and 7 (rate limited), plus 2 if an upstream authentication
+  boundary applies. Code 5 is emitted by `coverage assess` when its aggregate result is
+  `incomplete` — that is, when at least one question returned a source error.

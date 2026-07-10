@@ -66,5 +66,13 @@ normalized values before updating the source snapshot. `volvo markets list` and 
 list` therefore reflect the last successful sync. Query-scoped auto-search remains lean and does
 not populate the catalog.
 
+`volvo coverage assess` evaluates one `--topic` against one or more repeatable `--question` flags
+using only query-scoped (GraphQL) adapters, retrieving each question independently and never
+reading local FTS first, so `no_results` reflects genuine upstream absence. Each question reports
+`evidence_found`, `no_results`, or `source_error`; a source error on one question does not abort the
+others. The full report is always written before any error is returned. Questions that find
+evidence are persisted (item upsert plus source snapshot); the aggregate `status` is `incomplete`
+and the process exits `5` when any question source-errors.
+
 The module path is temporarily `github.com/jviklun1/pp-volvo-cars` until the owning internal Git organization is
 selected.

@@ -1,0 +1,36 @@
+{
+  "topic": "Home charging problems",
+  "market": "gb",
+  "status": "incomplete",
+  "questions": [
+    {
+      "question": "Why is my car not charging?",
+      "outcome": "evidence_found",
+      "results": [
+        {
+          "id": "751a92ec907b96b8810eb288ab380c55f1ed50f826cc09ecda867ad463d2d79b",
+          "source_type": "support_article",
+          "source_id": "doc-1",
+          "market": "gb",
+          "language": "en",
+          "title": "Home charging",
+          "body": "Plug in the cable.",
+          "captured_at": "2026-07-10T12:00:00Z",
+          "content_hash": "a9693ab8988f606ad87a2845e6ccf184674854cfbc5c43afa93174f11b585032"
+        }
+      ]
+    },
+    {
+      "question": "Why did charging stop?",
+      "outcome": "no_results",
+      "results": []
+    },
+    {
+      "question": "Why is the app broken?",
+      "outcome": "source_error",
+      "results": [],
+      "error": "support document was not found",
+      "error_code": 1
+    }
+  ]
+}
