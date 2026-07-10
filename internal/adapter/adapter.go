@@ -15,6 +15,8 @@ type SyncOptions struct {
 // SyncResult is the normalized output of refreshing one source-market slice.
 type SyncResult struct {
 	Items    []domain.KnowledgeItem
+	Markets  []domain.MarketRef
+	Models   []domain.ModelRef
 	Snapshot domain.SourceSnapshot
 }
 
