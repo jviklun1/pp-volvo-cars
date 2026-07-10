@@ -68,11 +68,19 @@ not populate the catalog.
 
 `volvo coverage assess` evaluates one `--topic` against one or more repeatable `--question` flags
 using only query-scoped (GraphQL) adapters, retrieving each question independently and never
-reading local FTS first, so `no_results` reflects genuine upstream absence. Each question reports
-`evidence_found`, `no_results`, or `source_error`; a source error on one question does not abort the
-others. The full report is always written before any error is returned. Questions that find
-evidence are persisted (item upsert plus source snapshot); the aggregate `status` is `incomplete`
-and the process exits `5` when any question source-errors.
+reading local FTS first. Querying live removes the local-cache ambiguity that a stale sync would
+introduce, but `no_results` means only that the supplied query returned no usable hits: it is a
+gap candidate, not proof of corpus or content absence. This API is search-first and cannot
+enumerate a full market, so a Foundry agent must not convert `no_results` into a confirmed
+knowledge gap. The command inherits the persistent `--data-source` flag but always uses live
+query-scoped sources, so an explicitly supplied `--data-source` is rejected with exit `4` before
+any adapter call. Each question reports `evidence_found`, `no_results`, or `source_error`; a source
+error on one question does not abort the others. The full report is always written before any error
+is returned, including an internal evidence-persistence failure; when a persistence failure and a
+source error coexist, the process returns the internal failure (exit `1`) while retaining every
+per-question source diagnostic in the report. Questions that find evidence are persisted (item
+upsert plus source snapshot); the aggregate `status` is `incomplete` and the process exits `5` when
+any question source-errors.
 
 The module path is temporarily `github.com/jviklun1/pp-volvo-cars` until the owning internal Git organization is
 selected.

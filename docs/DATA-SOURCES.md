@@ -65,3 +65,8 @@ language so callers can judge evidence freshness.
   arguments), 5 (insufficient evidence), and 7 (rate limited), plus 2 if an upstream authentication
   boundary applies. Code 5 is emitted by `coverage assess` when its aggregate result is
   `incomplete` — that is, when at least one question returned a source error.
+- `coverage assess` is search-first: a `no_results` outcome is a **gap candidate, not proof of
+  content absence**. Because the support API cannot enumerate a full market corpus, zero hits mean
+  only that the supplied query returned nothing usable and must never be reported to a caller as
+  confirmed missing knowledge. `coverage assess` always uses live query-scoped sources, so it does
+  not accept `--data-source`; an explicit value is rejected as invalid arguments (exit 4).
