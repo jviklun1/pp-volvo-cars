@@ -122,6 +122,15 @@ func TestBareRootShowsHelp(t *testing.T) {
 	}
 }
 
+func TestSearchRejectsBlankQuery(t *testing.T) {
+	root := NewRoot(App{Out: &bytes.Buffer{}})
+	root.SetArgs([]string{"search", "   ", "--market", "se", "--data-source", "local"})
+	err := root.ExecuteContext(context.Background())
+	if exiterrors.CodeOf(err) != exiterrors.CodeInvalidArguments || !strings.Contains(err.Error(), "search query is required") {
+		t.Fatalf("blank search error = %v, code = %d", err, exiterrors.CodeOf(err))
+	}
+}
+
 func TestSyncPersistsCatalog(t *testing.T) {
 	ctx := context.Background()
 	database, err := store.Open(ctx, filepath.Join(t.TempDir(), "cli.sqlite"))

@@ -1,10 +1,13 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
+	"strings"
 
 	"example.com/volvo/internal/adapter"
 	"example.com/volvo/internal/domain"
+	exiterrors "example.com/volvo/internal/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -20,6 +23,9 @@ func newSearchCommand(app App, options *globalOptions) *cobra.Command {
 		Use:  "search <question>",
 		Args: exactArgs(1),
 		RunE: func(command *cobra.Command, args []string) error {
+			if strings.TrimSpace(args[0]) == "" {
+				return exiterrors.WithCode(exiterrors.CodeInvalidArguments, errors.New("search query is required"))
+			}
 			market, err := normalizeMarket(marketInput)
 			if err != nil {
 				return err
