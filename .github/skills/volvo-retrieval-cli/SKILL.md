@@ -40,3 +40,11 @@ description: >
 - Normalize framework-generated flag and positional-argument failures to the CLI's
   documented invalid-argument error. Test unknown-command and bare-root behavior when
   customizing Cobra's root validation.
+- Select pluggable adapters by a capability exposed in the shared adapter contract, rather than by
+  a concrete type or source key. This keeps command logic independent of composition-root choices.
+- Use Cobra `StringArrayVar` for repeatable free-text input; `StringSliceVar` splits commas and
+  corrupts otherwise valid customer questions.
+- When an inherited persistent flag is invalid for a subcommand, reject only explicit use with
+  `command.Flags().Changed` before side effects, so the inherited default remains harmless.
+- For any report-before-error guarantee, retain side-effect errors, finish the requested work,
+  write the report, then return the chosen highest-priority error. Test output-writer failures too.
