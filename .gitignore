@@ -1,0 +1,23 @@
+.workflow/
+
+# Local knowledge stores and sensitive source captures
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+*.har
+*.schema.json
+*.introspection.json
+schema-snapshots/
+captures/
+
+# Go build and test outputs
+/volvo
+bin/
+dist/
+*.test
+coverage.out
+
+.DS_Store
