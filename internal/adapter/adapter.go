@@ -26,8 +26,18 @@ type SearchOptions struct {
 	Limit         int
 }
 
+// CacheScope describes whether Sync can populate a whole market or whether
+// content can only be captured in response to a specific search query.
+type CacheScope string
+
+const (
+	CacheScopeMarket CacheScope = "market"
+	CacheScopeQuery  CacheScope = "query"
+)
+
 // Adapter retrieves one official source while exposing only normalized types.
 type Adapter interface {
+	CacheScope() CacheScope
 	Sync(ctx context.Context, market domain.Market, options SyncOptions) (SyncResult, error)
 	Search(ctx context.Context, query string, options SearchOptions) ([]domain.KnowledgeItem, error)
 	Get(ctx context.Context, itemID string) (domain.KnowledgeItem, error)

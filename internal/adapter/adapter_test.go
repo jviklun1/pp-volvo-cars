@@ -9,6 +9,8 @@ import (
 
 type stubAdapter struct{}
 
+func (stubAdapter) CacheScope() CacheScope { return CacheScopeMarket }
+
 func (stubAdapter) Sync(context.Context, domain.Market, SyncOptions) (SyncResult, error) {
 	return SyncResult{}, nil
 }

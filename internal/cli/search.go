@@ -42,14 +42,15 @@ func newSearchCommand(app App, options *globalOptions) *cobra.Command {
 				value := domain.Language(languageInput)
 				language = &value
 			}
+			searchOptions := adapter.SearchOptions{
+				Market: market, Language: language, Applicability: filter, Limit: limit,
+			}
 
 			if options.DataSource == "live" {
 				var items []domain.KnowledgeItem
 				for _, sourceType := range adapterTypes(app) {
 					sourceAdapter := app.Adapters[sourceType]
-					values, err := sourceAdapter.Search(command.Context(), args[0], adapter.SearchOptions{
-						Market: market, Language: language, Applicability: filter, Limit: limit,
-					})
+					values, err := sourceAdapter.Search(command.Context(), args[0], searchOptions)
 					if err != nil {
 						return err
 					}
@@ -62,7 +63,7 @@ func newSearchCommand(app App, options *globalOptions) *cobra.Command {
 				}{Market: market, Query: args[0], Results: items})
 			}
 			if options.DataSource == "auto" {
-				if err := refresh(command.Context(), app, market, false); err != nil {
+				if err := refreshForSearch(command.Context(), app, args[0], searchOptions); err != nil {
 					return err
 				}
 			}

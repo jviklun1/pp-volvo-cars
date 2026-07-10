@@ -1,0 +1,68 @@
+{
+  "data": {
+    "market": {
+      "search": {
+        "results": [
+          {
+            "score": 1.5157523,
+            "matchingParagraph": [],
+            "document": {
+              "documentId": "32baedb1923875bac0a801517b21e068",
+              "externalId": "32baedb1923875bac0a801517b21e068",
+              "fullDocumentId": "759e6cc5467aefecc0a80189233354e6_3af1b29c467b46bbc0a801897a0df87e_32baedb1923875bac0a801517b21e068",
+              "language": "en-GB",
+              "documentType": "LATEST_INFO",
+              "lastUpdate": "2026-04-10T11:11:09.120545",
+              "stringContent": {
+                "title": "Plug & Charge",
+                "description": "Plug & Charge is an authentication and billing system that simplifies your charging experience."
+              },
+              "jsonContent": {
+                "body": {
+                  "type": "segment",
+                  "children": [
+                    {
+                      "type": "note",
+                      "children": [
+                        {"type": "title", "children": "Note"},
+                        "Even if Plug & Charge is included in the charging view, it may not be available in your country."
+                      ]
+                    },
+                    {
+                      "type": "paragraph",
+                      "children": {
+                        "type": "text",
+                        "children": [
+                          "You can find charging stations that support Plug & Charge through Google Maps in the centre display."
+                        ]
+                      }
+                    },
+                    {
+                      "type": "subSegment",
+                      "children": [
+                        {"type": "title", "children": "Applicable models"},
+                        {
+                          "type": "paragraph",
+                          "children": {
+                            "type": "text",
+                            "children": [
+                              {"type": "text", "options": ["bold"], "children": "EX30"},
+                              ", model year 2026 and later"
+                            ]
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "jsonContentSchemaVersion": "1.0.0-beta.3"
+              },
+              "applicableTo": []
+            }
+          }
+        ]
+      },
+      "carByModelSlug": null
+    }
+  }
+}

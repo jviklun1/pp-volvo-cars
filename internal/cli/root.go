@@ -152,3 +152,48 @@ func refresh(ctx context.Context, app App, market domain.Market, force bool) err
 	}
 	return nil
 }
+
+func refreshForSearch(ctx context.Context, app App, query string, options adapter.SearchOptions) error {
+	for _, sourceType := range adapterTypes(app) {
+		sourceAdapter := app.Adapters[sourceType]
+		if sourceAdapter.CacheScope() == adapter.CacheScopeQuery {
+			items, err := sourceAdapter.Search(ctx, query, options)
+			if err != nil {
+				return err
+			}
+			for _, item := range items {
+				if err := app.Store.UpsertItem(ctx, item); err != nil {
+					return err
+				}
+			}
+			snapshot, err := sourceAdapter.Status(ctx, options.Market)
+			if err != nil {
+				return err
+			}
+			if err := app.Store.SaveSnapshot(ctx, snapshot); err != nil {
+				return err
+			}
+			continue
+		}
+		stale, _, err := app.Store.IsStale(ctx, sourceType, options.Market, app.Now().UTC())
+		if err != nil {
+			return err
+		}
+		if !stale {
+			continue
+		}
+		result, err := sourceAdapter.Sync(ctx, options.Market, adapter.SyncOptions{})
+		if err != nil {
+			return err
+		}
+		for _, item := range result.Items {
+			if err := app.Store.UpsertItem(ctx, item); err != nil {
+				return err
+			}
+		}
+		if err := app.Store.SaveSnapshot(ctx, result.Snapshot); err != nil {
+			return err
+		}
+	}
+	return nil
+}

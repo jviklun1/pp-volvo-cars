@@ -19,8 +19,10 @@ store   adapter  search
   candidate values. It has no internal dependencies.
 - `internal/store` owns SQLite persistence, FTS5, content diffs, and freshness predicates. It
   imports only `domain` internally.
-- `internal/adapter` defines the source contract. The implemented `marketpages` package currently
-  provides deterministic SE/GB fixture parsing only; it does not fetch pages.
+- `internal/adapter` defines the source contract and cache scope. `marketpages` provides
+  deterministic SE/GB fixture parsing only; it does not fetch pages. `supportgraphql` queries the
+  open Volvo Support Content Service with bounded retries and rate limiting, then maps live
+  documents into the normalized domain.
 - `internal/search` quotes lexical queries, calls a minimal store interface, and merges optional
   multilingual candidate scores. The default matcher is intentionally a no-op until an approved
   multilingual mechanism is selected.
@@ -52,8 +54,10 @@ including foreign-key enforcement, apply consistently.
 
 The binary is `volvo`. Market is mandatory for retrieval and `uk` normalizes to canonical `gb`.
 `--data-source` accepts `local`, `auto`, or `live`. Auto refresh is orchestrated by the CLI using
-7-day stable and 24-hour volatile thresholds. `get` rejects live mode because its synthetic item
-ID exists only after capture. JSON field names and process exit codes are stable agent contracts.
+7-day stable and 24-hour volatile thresholds. Market-scoped adapters refresh a whole slice when
+stale; the support API is query-scoped, so auto mode captures the current query before local FTS.
+`get` rejects live mode because its synthetic item ID exists only after capture. JSON field names
+and process exit codes are stable agent contracts.
 
 The module path is temporarily `example.com/volvo` until the owning internal Git organization is
 selected.

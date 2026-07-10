@@ -50,7 +50,7 @@ type KnowledgeItem struct {
 	Language      Language        `json:"language"`
 	Title         string          `json:"title"`
 	Body          string          `json:"body"`
-	RawJSON       []byte          `json:"raw_json,omitempty"`
+	RawJSON       []byte          `json:"-"`
 	Applicability []Applicability `json:"applicability,omitempty"`
 	CapturedAt    time.Time       `json:"captured_at"`
 	ContentHash   string          `json:"content_hash"`

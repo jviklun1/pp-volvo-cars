@@ -15,16 +15,23 @@ of scope. HAR files and schema captures are gitignored because they may contain 
 
 ## Support and knowledge GraphQL
 
-The support/knowledge GraphQL adapter is intentionally not implemented. The endpoint and fields in
-the historical session report are unverified hypotheses, not a contract. Work remains gated on:
+The Volvo Support Content Service endpoint is open and requires no authentication. On 2026-07-09,
+targeted live introspection and real market-level and car-scoped searches verified the adapter's
+field and enum contracts. A sanitized response captured from that live check is committed as a
+mapping fixture; the client has bounded retry, rate-limit, response-size, and timeout controls.
 
-1. approval for the authentication and credential-distribution mechanism; and
-2. permission to introspect the live schema or access an authoritative captured schema.
+This API is search-first: it does not expose a complete market-wide document enumeration. Its
+cache scope is therefore query-specific. `--data-source auto` searches the live support service,
+persists those normalized results, and then uses local FTS. The `sync` operation verifies market
+availability but must not be interpreted as a full corpus export.
 
-After approval, capture the real schema privately, compare it with prior assumptions, implement a
-rate-limited client, and map a sanitized real response fixture into the existing domain types. Do
-not hand-write response structures from the historical report and do not run printing-press or
-other discovery generators against the private endpoint.
+The public API currently exposes the United Kingdom as `uk` (including duplicate market rows).
+The CLI retains canonical `gb` and translates to `uk` only at the upstream boundary. Market and
+car searches use distinct GraphQL enum types—`MarketSearchType` and `CarSearchType`—despite sharing
+the same enum values.
+
+Do not run printing-press or other generation pipelines against the endpoint; the hand-written,
+minimal query contract is intentional and covered by live and fixture verification.
 
 ## Multilingual retrieval
 

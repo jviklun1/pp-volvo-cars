@@ -33,6 +33,7 @@ func TestMarketsJSONGoldenAndSearchShape(t *testing.T) {
 		SourceType: domain.SourceTypeSupportArticle, SourceID: "x", Market: "se", Language: "sv",
 		Title: "X", Body: "x evidence", CapturedAt: now,
 	}
+	item.RawJSON = []byte(`{"internal":"payload"}`)
 	item.ID = domain.DeriveID(item.SourceType, item.SourceID, item.Market, item.Language)
 	item.ContentHash = domain.DeriveContentHash(item.Body)
 	if err := database.UpsertItem(ctx, item); err != nil {
@@ -75,6 +76,9 @@ func TestMarketsJSONGoldenAndSearchShape(t *testing.T) {
 	}
 	if err := json.Unmarshal(output.Bytes(), &response); err != nil {
 		t.Fatalf("invalid search JSON: %v\n%s", err, output.String())
+	}
+	if strings.Contains(output.String(), "raw_json") || strings.Contains(output.String(), "payload") {
+		t.Fatalf("search JSON leaked internal raw payload: %s", output.String())
 	}
 	if response.Market != "se" || response.Query != "x" || len(response.Results) != 1 || response.Results[0].Item.ID != item.ID {
 		t.Fatalf("unexpected search response: %#v", response)

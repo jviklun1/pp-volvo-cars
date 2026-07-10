@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"os"
 
+	"example.com/volvo/internal/adapter"
+	"example.com/volvo/internal/adapter/supportgraphql"
 	"example.com/volvo/internal/cli"
+	"example.com/volvo/internal/domain"
 	exiterrors "example.com/volvo/internal/errors"
 	"example.com/volvo/internal/search"
 	"example.com/volvo/internal/store"
@@ -22,10 +25,12 @@ func main() {
 		os.Exit(int(exiterrors.CodeInternal))
 	}
 	defer database.Close()
+	support := supportgraphql.New()
 
 	root := cli.NewRoot(cli.App{
 		Store: database, Search: search.New(search.NewLexical(database), search.PassthroughMatcher{}),
-		Out: os.Stdout, ErrOut: os.Stderr,
+		Adapters: map[domain.SourceType]adapter.Adapter{domain.SourceTypeSupportArticle: support},
+		Out:      os.Stdout, ErrOut: os.Stderr,
 	})
 	if err := root.ExecuteContext(context.Background()); err != nil {
 		fmt.Fprintln(os.Stderr, err)
