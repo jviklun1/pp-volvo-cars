@@ -21,6 +21,8 @@ func TestCodeOf(t *testing.T) {
 		{name: "insufficient evidence", err: WithCode(CodeInsufficientEvidence, base), want: CodeInsufficientEvidence},
 		{name: "rate limited", err: WithCode(CodeRateLimited, base), want: CodeRateLimited},
 		{name: "wrapped typed error", err: fmt.Errorf("outer: %w", WithCode(CodeNotFound, base)), want: CodeNotFound},
+		{name: "wrapped rate-limit sentinel", err: fmt.Errorf("outer: %w", ErrRateLimited), want: CodeRateLimited},
+		{name: "authentication sentinel", err: ErrAuthentication, want: CodeAuthentication},
 		{name: "success code cannot mask failure", err: WithCode(CodeOK, base), want: CodeInternal},
 		{name: "invalid typed code", err: WithCode(Code(99), base), want: CodeInternal},
 	}

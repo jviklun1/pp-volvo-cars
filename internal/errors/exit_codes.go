@@ -19,6 +19,11 @@ const (
 	CodeRateLimited          Code = 7
 )
 
+var (
+	ErrRateLimited    = stderrors.New("rate limited")
+	ErrAuthentication = stderrors.New("authentication failed")
+)
+
 // Valid reports whether the code is part of the public CLI contract.
 func (code Code) Valid() bool {
 	switch code {
@@ -74,6 +79,12 @@ func CodeOf(err error) Code {
 	var exitErr *ExitError
 	if stderrors.As(err, &exitErr) && exitErr.Code.Valid() && exitErr.Code != CodeOK {
 		return exitErr.Code
+	}
+	if stderrors.Is(err, ErrRateLimited) {
+		return CodeRateLimited
+	}
+	if stderrors.Is(err, ErrAuthentication) {
+		return CodeAuthentication
 	}
 	return CodeInternal
 }
