@@ -43,12 +43,12 @@ func TestStoreBootstrapFTSAndIdempotency(t *testing.T) {
 		}
 	}
 
-	results, err := store.SearchFTS(ctx, "charging", item.Market, nil, 10)
+	results, err := store.SearchFTS(ctx, "charging", item.Market, nil, domain.ApplicabilityFilter{}, 10)
 	if err != nil {
 		t.Fatalf("SearchFTS() error = %v", err)
 	}
-	if len(results) != 1 || results[0].Item.ID != item.ID {
-		t.Fatalf("SearchFTS() = %#v, want one hydrated item", results)
+	if len(results) != 1 || results[0].ItemID != item.ID {
+		t.Fatalf("SearchFTS() = %#v, want one candidate", results)
 	}
 
 	for table, want := range map[string]int{"knowledge_items": 1, "applicability": 1, "citations": 1, "content_diffs": 0} {
@@ -77,7 +77,7 @@ func TestStoreBootstrapFTSAndIdempotency(t *testing.T) {
 	if err := store.DeleteItem(ctx, item.ID); err != nil {
 		t.Fatalf("DeleteItem() error = %v", err)
 	}
-	results, err = store.SearchFTS(ctx, "charging", item.Market, nil, 10)
+	results, err = store.SearchFTS(ctx, "charging", item.Market, nil, domain.ApplicabilityFilter{}, 10)
 	if err != nil {
 		t.Fatalf("SearchFTS() after delete error = %v", err)
 	}

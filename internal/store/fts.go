@@ -7,59 +7,55 @@ import (
 	"example.com/volvo/internal/domain"
 )
 
-// FTSResult is one hydrated lexical match and its SQLite BM25 rank.
-type FTSResult struct {
-	Item domain.KnowledgeItem
-	Rank float64
-}
-
 // SearchFTS searches one explicit market and optional language.
 func (store *Store) SearchFTS(
 	ctx context.Context,
 	query string,
 	market domain.Market,
 	language *domain.Language,
+	filter domain.ApplicabilityFilter,
 	limit int,
-) ([]FTSResult, error) {
+) ([]domain.SearchCandidate, error) {
 	if limit <= 0 {
 		limit = 20
 	}
 	rows, err := store.db.QueryContext(ctx, `
-        SELECT knowledge_items.id, bm25(knowledge_items_fts)
+        SELECT knowledge_items.id, -bm25(knowledge_items_fts)
         FROM knowledge_items_fts
         JOIN knowledge_items ON knowledge_items.rowid = knowledge_items_fts.rowid
         WHERE knowledge_items_fts MATCH ?
           AND knowledge_items.market = ?
           AND (? IS NULL OR knowledge_items.language = ?)
+          AND (
+              NOT EXISTS (
+                  SELECT 1 FROM applicability a0 WHERE a0.knowledge_item_id = knowledge_items.id
+              )
+              OR EXISTS (
+                  SELECT 1 FROM applicability a WHERE a.knowledge_item_id = knowledge_items.id
+                    AND (? IS NULL OR a.model_slug IS NULL OR a.model_slug = ?)
+                    AND (? IS NULL OR a.model_year IS NULL OR a.model_year = ?)
+                    AND (? IS NULL OR a.powertrain IS NULL OR a.powertrain = ?)
+              )
+          )
         ORDER BY bm25(knowledge_items_fts)
-        LIMIT ?`, query, market, language, language, limit)
+        LIMIT ?`, query, market, language, language,
+		filter.ModelSlug, filter.ModelSlug, filter.ModelYear, filter.ModelYear,
+		filter.Powertrain, filter.Powertrain, limit)
 	if err != nil {
 		return nil, fmt.Errorf("search FTS: %w", err)
 	}
-	type match struct {
-		id   string
-		rank float64
-	}
-	var matches []match
+	var results []domain.SearchCandidate
 	for rows.Next() {
-		var value match
-		if err := rows.Scan(&value.id, &value.rank); err != nil {
+		var candidate domain.SearchCandidate
+		if err := rows.Scan(&candidate.ItemID, &candidate.Score); err != nil {
 			_ = rows.Close()
 			return nil, fmt.Errorf("scan FTS result: %w", err)
 		}
-		matches = append(matches, value)
+		results = append(results, candidate)
 	}
 	if err := rows.Close(); err != nil {
 		return nil, err
 	}
 
-	results := make([]FTSResult, 0, len(matches))
-	for _, match := range matches {
-		item, err := store.GetItem(ctx, match.id)
-		if err != nil {
-			return nil, fmt.Errorf("hydrate FTS result: %w", err)
-		}
-		results = append(results, FTSResult{Item: item, Rank: match.rank})
-	}
 	return results, nil
 }
