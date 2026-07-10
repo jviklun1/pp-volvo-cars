@@ -22,7 +22,6 @@ query Search($market: ID!, $query: String!, $include: [MarketSearchType!]!, $lan
           document {
             documentId externalId fullDocumentId language documentType lastUpdate
             stringContent { title description }
-            jsonContent { body jsonContentSchemaVersion }
             applicableTo { title values }
           }
         }
@@ -43,7 +42,6 @@ query SearchCar($market: ID!, $modelSlug: String!, $query: String!, $include: [C
             document {
               documentId externalId fullDocumentId language documentType lastUpdate
               stringContent { title description }
-              jsonContent { body jsonContentSchemaVersion }
               applicableTo { title values }
             }
           }
@@ -191,8 +189,26 @@ func (adapter *Adapter) Search(ctx context.Context, query string, options basead
 	}
 	capturedAt := adapter.now().UTC()
 	items := make([]domain.KnowledgeItem, 0, len(response.Results))
+	type hydrationKey struct {
+		documentID string
+		language   domain.Language
+	}
+	hydrated := make(map[hydrationKey]document, len(response.Results))
 	for _, result := range response.Results {
-		item, err := mapDocument(result.Document, options.Market, capturedAt, result.MatchingParagraph)
+		key := hydrationKey{
+			documentID: result.Document.DocumentID,
+			language:   domain.Language(result.Document.Language),
+		}
+		fullDocument, ok := hydrated[key]
+		if !ok {
+			var err error
+			fullDocument, err = adapter.fetchDocument(ctx, options.Market, key.documentID, key.language)
+			if err != nil {
+				return nil, err
+			}
+			hydrated[key] = fullDocument
+		}
+		item, err := mapDocument(fullDocument, options.Market, capturedAt, result.MatchingParagraph)
 		if err != nil {
 			return nil, err
 		}
@@ -216,18 +232,31 @@ func (adapter *Adapter) Get(ctx context.Context, itemID string) (domain.Knowledg
 	if !ok {
 		return domain.KnowledgeItem{}, errors.New("support item must be discovered by search before Get")
 	}
-	var data documentData
-	variables := map[string]any{
-		"market": upstreamMarket(reference.Market), "documentID": reference.DocumentID,
-		"languages": []string{string(reference.Language)},
-	}
-	if err := adapter.client.query(ctx, documentQuery, variables, &data); err != nil {
+	value, err := adapter.fetchDocument(ctx, reference.Market, reference.DocumentID, reference.Language)
+	if err != nil {
 		return domain.KnowledgeItem{}, err
 	}
-	if data.Market == nil || data.Market.Document == nil {
-		return domain.KnowledgeItem{}, errors.New("support document was not found")
+	return mapDocument(value, reference.Market, adapter.now().UTC(), nil)
+}
+
+func (adapter *Adapter) fetchDocument(
+	ctx context.Context,
+	market domain.Market,
+	documentID string,
+	language domain.Language,
+) (document, error) {
+	var data documentData
+	variables := map[string]any{
+		"market": upstreamMarket(market), "documentID": documentID,
+		"languages": []string{string(language)},
 	}
-	return mapDocument(*data.Market.Document, reference.Market, adapter.now().UTC(), nil)
+	if err := adapter.client.query(ctx, documentQuery, variables, &data); err != nil {
+		return document{}, err
+	}
+	if data.Market == nil || data.Market.Document == nil {
+		return document{}, errors.New("support document was not found")
+	}
+	return *data.Market.Document, nil
 }
 
 func (adapter *Adapter) Status(_ context.Context, market domain.Market) (domain.SourceSnapshot, error) {

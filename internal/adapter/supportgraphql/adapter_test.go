@@ -19,15 +19,38 @@ func TestSearchMapsLiveCapturedResponse(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	var captured struct {
+		Data searchData `json:"data"`
+	}
+	if err := json.Unmarshal(fixture, &captured); err != nil {
+		t.Fatal(err)
+	}
+	documentFixture, err := json.Marshal(map[string]any{
+		"data": map[string]any{
+			"market": map[string]any{
+				"document": captured.Data.Market.Search.Results[0].Document,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		var payload graphqlRequest
 		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
 			t.Error(err)
 		}
-		if payload.Variables["market"] != "uk" || payload.Variables["query"] != "charging" {
-			t.Errorf("variables = %#v", payload.Variables)
-		}
 		writer.Header().Set("Content-Type", "application/json")
+		if strings.Contains(payload.Query, "query Document") {
+			if payload.Variables["market"] != "uk" || payload.Variables["documentID"] != "32baedb1923875bac0a801517b21e068" {
+				t.Errorf("document variables = %#v", payload.Variables)
+			}
+			_, _ = writer.Write(documentFixture)
+			return
+		}
+		if payload.Variables["market"] != "uk" || payload.Variables["query"] != "charging" {
+			t.Errorf("search variables = %#v", payload.Variables)
+		}
 		_, _ = writer.Write(fixture)
 	}))
 	defer server.Close()
