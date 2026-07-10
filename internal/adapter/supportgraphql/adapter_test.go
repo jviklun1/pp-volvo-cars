@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -92,6 +93,109 @@ func TestSearchQueriesUseFieldSpecificEnumTypes(t *testing.T) {
 	}
 	if !strings.Contains(carSearchQuery, "$include: [CarSearchType!]!") {
 		t.Fatalf("car search enum contract drifted: %s", carSearchQuery)
+	}
+	if strings.Contains(marketSearchQuery, "jsonContent") || strings.Contains(carSearchQuery, "jsonContent") {
+		t.Fatal("search queries must not request nested jsonContent")
+	}
+	if !strings.Contains(documentQuery, "jsonContent { body jsonContentSchemaVersion }") {
+		t.Fatalf("full document query lost jsonContent: %s", documentQuery)
+	}
+}
+
+func TestSearchDiscoversThenHydratesUniqueDocuments(t *testing.T) {
+	documents := map[string]document{
+		"doc-b": {
+			DocumentID: "doc-b", Language: "en-GB", DocumentType: "SUPPORT_ARTICLE",
+			StringContent: stringContent{Title: "Document B", Description: "Description B"},
+			JSONContent:   documentJSON{Body: json.RawMessage(`{"type":"segment","children":["Full body B"]}`)},
+		},
+		"doc-a": {
+			DocumentID: "doc-a", Language: "en-GB", DocumentType: "USER_MANUAL",
+			StringContent: stringContent{Title: "Document A", Description: "Description A"},
+			JSONContent:   documentJSON{Body: json.RawMessage(`{"type":"segment","children":["Full body A"]}`)},
+		},
+	}
+	searchFixture := []byte(`{
+      "data": {"market": {"search": {"results": [
+        {"matchingParagraph":["first B"],"document":{"documentId":"doc-b","language":"en-GB","documentType":"SUPPORT_ARTICLE","stringContent":{"title":"Document B","description":"Description B"},"applicableTo":[]}},
+        {"matchingParagraph":["A match"],"document":{"documentId":"doc-a","language":"en-GB","documentType":"USER_MANUAL","stringContent":{"title":"Document A","description":"Description A"},"applicableTo":[]}},
+        {"matchingParagraph":["second B"],"document":{"documentId":"doc-b","language":"en-GB","documentType":"SUPPORT_ARTICLE","stringContent":{"title":"Document B","description":"Description B"},"applicableTo":[]}}
+      ]},"carByModelSlug":null}}
+    }`)
+
+	var mu sync.Mutex
+	hydrations := make(map[string]int)
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		var payload graphqlRequest
+		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
+			t.Error(err)
+			writer.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		writer.Header().Set("Content-Type", "application/json")
+		if strings.Contains(payload.Query, "query Search(") {
+			if strings.Contains(payload.Query, "jsonContent") {
+				t.Error("discovery query requested jsonContent")
+			}
+			if payload.Variables["market"] != "uk" || payload.Variables["maxResults"] != float64(20) {
+				t.Errorf("search variables = %#v", payload.Variables)
+			}
+			include, ok := payload.Variables["include"].([]any)
+			if !ok || len(include) != len(searchTypes) {
+				t.Errorf("search include = %#v", payload.Variables["include"])
+			}
+			_, _ = writer.Write(searchFixture)
+			return
+		}
+		if !strings.Contains(payload.Query, "query Document") || !strings.Contains(payload.Query, "jsonContent") {
+			t.Errorf("unexpected hydration query: %s", payload.Query)
+			writer.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		documentID, _ := payload.Variables["documentID"].(string)
+		languages, ok := payload.Variables["languages"].([]any)
+		if payload.Variables["market"] != "uk" || !ok || len(languages) != 1 || languages[0] != "en-GB" {
+			t.Errorf("document variables = %#v", payload.Variables)
+		}
+		value, ok := documents[documentID]
+		if !ok {
+			t.Errorf("unknown document %q", documentID)
+			writer.WriteHeader(http.StatusNotFound)
+			return
+		}
+		mu.Lock()
+		hydrations[documentID]++
+		mu.Unlock()
+		_ = json.NewEncoder(writer).Encode(map[string]any{
+			"data": map[string]any{"market": map[string]any{"document": value}},
+		})
+	}))
+	defer server.Close()
+
+	now := time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC)
+	adapter := newAdapter(newClient(server.URL, server.Client(), 0, 1), func() time.Time { return now })
+	items, err := adapter.Search(context.Background(), "charging", baseadapter.SearchOptions{Market: "gb"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 3 {
+		t.Fatalf("items = %#v", items)
+	}
+	wantOrder := []string{"doc-b", "doc-a", "doc-b"}
+	wantBodies := []string{"Full body B", "Full body A", "Full body B"}
+	wantExcerpts := []string{"first B", "A match", "second B"}
+	for index := range items {
+		if items[index].SourceID != wantOrder[index] || items[index].Body != wantBodies[index] {
+			t.Errorf("items[%d] = (%q, %q), want (%q, %q)", index, items[index].SourceID, items[index].Body, wantOrder[index], wantBodies[index])
+		}
+		if len(items[index].Citations) != 1 || items[index].Citations[0].Excerpt != wantExcerpts[index] {
+			t.Errorf("items[%d].Citations = %#v, want excerpt %q", index, items[index].Citations, wantExcerpts[index])
+		}
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if hydrations["doc-a"] != 1 || hydrations["doc-b"] != 1 || len(hydrations) != 2 {
+		t.Fatalf("hydrations = %#v, want one per unique document/language", hydrations)
 	}
 }
 
