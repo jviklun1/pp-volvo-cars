@@ -16,6 +16,8 @@ import (
 
 var yearPattern = regexp.MustCompile(`\b(?:19|20)\d{2}\b`)
 var bodyModelPattern = regexp.MustCompile(`\b[A-Z]{2,3}[0-9]{2}\b`)
+var publicDocumentIDPattern = regexp.MustCompile(`^[a-zA-Z0-9-]+$`)
+var publicLocalePattern = regexp.MustCompile(`^[a-z]{2}(-[a-z]{2})?$`)
 
 func mapDocument(value document, market domain.Market, capturedAt time.Time, matchingParagraph []string) (domain.KnowledgeItem, error) {
 	body := flattenJSONBody(value.JSONContent.Body)
@@ -51,13 +53,50 @@ func mapDocument(value document, market domain.Market, capturedAt time.Time, mat
 		Applicability: applicability,
 		CapturedAt:    capturedAt.UTC(),
 		Citations: []domain.Citation{{
-			SourceURL: "volvo-support://document/" + value.DocumentID,
+			SourceURL: supportDocumentURL(value, market),
 			Excerpt:   excerpt(excerptValue, 400), Language: domain.Language(value.Language), CapturedAt: capturedAt.UTC(),
 		}},
 	}
 	item.ID = domain.DeriveID(item.SourceType, item.SourceID, item.Market, item.Language)
 	item.ContentHash = domain.DeriveContentHash(item.Body)
 	return item, nil
+}
+
+// Public topic pages use the leaf document ID, not the full ancestry ID.
+// Manuals and other document kinds require additional routing context; retain
+// their source reference rather than inventing a public page for them.
+func supportDocumentURL(value document, market domain.Market) string {
+	fallback := "volvo-support://document/" + value.DocumentID
+	if value.DocumentType != "LATEST_INFO" && value.DocumentType != "SUPPORT_ARTICLE" {
+		return fallback
+	}
+	if !publicDocumentIDPattern.MatchString(value.DocumentID) {
+		return fallback
+	}
+	locale := upstreamMarket(market)
+	switch locale {
+	case "be":
+		locale = "nl-be"
+		if strings.HasPrefix(value.Language, "fr") {
+			locale = "fr-be"
+		}
+	case "ca":
+		locale = "en-ca"
+		if strings.HasPrefix(value.Language, "fr") {
+			locale = "fr-ca"
+		}
+	case "ch":
+		locale = "de-ch"
+		if strings.HasPrefix(value.Language, "fr") {
+			locale = "fr-ch"
+		} else if strings.HasPrefix(value.Language, "it") {
+			locale = "it-ch"
+		}
+	}
+	if !publicLocalePattern.MatchString(locale) {
+		return fallback
+	}
+	return "https://www.volvocars.com/" + locale + "/support/topic/" + value.DocumentID + "/"
 }
 
 func mapBodyModelApplicability(raw json.RawMessage) []domain.Applicability {

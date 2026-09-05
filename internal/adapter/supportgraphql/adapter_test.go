@@ -75,7 +75,7 @@ func TestSearchMapsLiveCapturedResponse(t *testing.T) {
 	if item.Body != "Note Even if Plug & Charge is included in the charging view, it may not be available in your country. You can find charging stations that support Plug & Charge through Google Maps in the centre display. Applicable models EX30 , model year 2026 and later" {
 		t.Fatalf("body = %q", item.Body)
 	}
-	if len(item.Citations) != 1 || item.Citations[0].SourceURL != "volvo-support://document/32baedb1923875bac0a801517b21e068" {
+	if len(item.Citations) != 1 || item.Citations[0].SourceURL != "https://www.volvocars.com/uk/support/topic/32baedb1923875bac0a801517b21e068/" {
 		t.Fatalf("citations = %#v", item.Citations)
 	}
 	wantID := domain.DeriveID(item.SourceType, item.SourceID, item.Market, item.Language)
@@ -240,6 +240,35 @@ func TestSyncReturnsMarketAndModelCatalog(t *testing.T) {
 	for index := range wantModels {
 		if result.Models[index] != wantModels[index] {
 			t.Fatalf("models[%d] = %#v, want %#v", index, result.Models[index], wantModels[index])
+		}
+	}
+}
+
+func TestPublicTopicCitationsPreserveMarketAndDocumentIdentity(t *testing.T) {
+	for _, tc := range []struct{ market, language, locale string }{
+		{"gb", "en-GB", "uk"}, {"de", "de-DE", "de"},
+		{"be", "en-GB", "nl-be"}, {"be", "fr-FR", "fr-be"},
+		{"ca", "en-US", "en-ca"}, {"ca", "fr-CA", "fr-ca"},
+		{"ch", "de-DE", "de-ch"}, {"ch", "it-IT", "it-ch"},
+	} {
+		t.Run(tc.market+tc.language, func(t *testing.T) {
+			doc := document{DocumentID: "abc-123", FullDocumentID: "parent_abc-123", DocumentType: "LATEST_INFO", Language: tc.language}
+			want := "https://www.volvocars.com/" + tc.locale + "/support/topic/abc-123/"
+			if got := supportDocumentURL(doc, domain.Market(tc.market)); got != want {
+				t.Fatalf("citation = %q, want %q", got, want)
+			}
+		})
+	}
+	for _, kind := range []string{"USER_MANUAL", "QUALITY_BULLETIN", "UNKNOWN"} {
+		doc := document{DocumentID: "abc-123", DocumentType: kind}
+		if got := supportDocumentURL(doc, "gb"); got != "volvo-support://document/abc-123" {
+			t.Fatalf("%s invented a public route: %s", kind, got)
+		}
+	}
+	for _, id := range []string{"", "../other", "id?redirect=elsewhere", "id/child"} {
+		doc := document{DocumentID: id, DocumentType: "LATEST_INFO"}
+		if got := supportDocumentURL(doc, "gb"); strings.HasPrefix(got, "https://") {
+			t.Fatalf("invalid document ID generated a public URL: %s", got)
 		}
 	}
 }
