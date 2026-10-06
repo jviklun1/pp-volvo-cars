@@ -72,6 +72,8 @@ query Document($market: ID!, $documentID: String!, $languages: [String!]) {
   }
 }`
 
+var errDocumentNotFound = errors.New("support document was not found")
+
 var searchTypes = []string{
 	"LATEST_INFO", "SUPPORT_ARTICLE", "USER_MANUAL", "SOFTWARE_RELEASE_NOTES", "QUALITY_BULLETIN", "KNOWLEDGE",
 }
@@ -203,6 +205,9 @@ func (adapter *Adapter) Search(ctx context.Context, query string, options basead
 		if !ok {
 			var err error
 			fullDocument, err = adapter.fetchDocument(ctx, options.Market, key.documentID, key.language)
+			if errors.Is(err, errDocumentNotFound) {
+				continue
+			}
 			if err != nil {
 				return nil, err
 			}
@@ -253,8 +258,21 @@ func (adapter *Adapter) fetchDocument(
 	if err := adapter.client.query(ctx, documentQuery, variables, &data); err != nil {
 		return document{}, err
 	}
-	if data.Market == nil || data.Market.Document == nil {
-		return document{}, errors.New("support document was not found")
+	if data.Market == nil {
+		return document{}, fmt.Errorf("Volvo support market %q was not found", variables["market"])
+	}
+	if data.Market.Document == nil && language != "" {
+		// An omitted language asks the source for the market's default document.
+		delete(variables, "languages")
+		if err := adapter.client.query(ctx, documentQuery, variables, &data); err != nil {
+			return document{}, err
+		}
+		if data.Market == nil {
+			return document{}, fmt.Errorf("Volvo support market %q was not found", variables["market"])
+		}
+	}
+	if data.Market.Document == nil {
+		return document{}, errDocumentNotFound
 	}
 	return *data.Market.Document, nil
 }

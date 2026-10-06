@@ -67,7 +67,7 @@ func mapDocument(value document, market domain.Market, capturedAt time.Time, mat
 // their source reference rather than inventing a public page for them.
 func supportDocumentURL(value document, market domain.Market) string {
 	fallback := "volvo-support://document/" + value.DocumentID
-	if value.DocumentType != "LATEST_INFO" && value.DocumentType != "SUPPORT_ARTICLE" {
+	if value.DocumentType != "LATEST_INFO" && value.DocumentType != "SUPPORT_ARTICLE" && value.DocumentType != "SUPPORT_CONTENT" {
 		return fallback
 	}
 	if !publicDocumentIDPattern.MatchString(value.DocumentID) {
